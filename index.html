@@ -46,7 +46,7 @@
       let shuffledThisTurn = false;
       let shuffleTimeoutId = null;
       let remainingCells = 0;
-      let isForceShuffleUsed = false; // 【新規】強制シャッフルが使用済みかどうかのフラグ
+      let isForceShuffleUsed = false;
 
       // 難易度ごとのパラメータ定義
       const config = {
@@ -93,7 +93,7 @@
         shuffleProbability = 0;
         isFirstClick = true;
         shuffledThisTurn = false;
-        isForceShuffleUsed = false; // 【新規】新ゲーム開始時にフラグをリセット
+        isForceShuffleUsed = false;
         if (shuffleTimeoutId) clearTimeout(shuffleTimeoutId);
         gameState = "playing";
         render();
@@ -202,13 +202,13 @@
         recalculateNeighbors();
       }
 
-      // 【新規】強制シャッフルボタンのクリックハンドラ
+      // 強制シャッフルボタンのクリックハンドラ
       function handleForceShuffle() {
         if (gameState !== "playing" || isForceShuffleUsed || isFirstClick)
           return;
 
         shuffleMines();
-        shuffleProbability = 0; // 蓄積された確率カウントを初期化
+        shuffleProbability = 0;
         isForceShuffleUsed = true;
         shuffledThisTurn = true;
 
@@ -344,15 +344,26 @@
           gameState === "lost"
             ? "border-red-500/40 shadow-red-900/30"
             : "border-slate-700";
+
+        // 難易度に応じて全体の最大幅（max-w）を可変にする
+        const containerWidthClass =
+          gameState === "start"
+            ? "max-w-md"
+            : difficulty === "easy"
+              ? "max-w-sm"
+              : difficulty === "hard"
+                ? "max-w-xl"
+                : "max-w-4xl";
+
         const headerHtml = `
-        <div class="max-w-md w-full bg-slate-800 rounded-2xl shadow-2xl border ${containerBorderClass} p-6 flex flex-col items-center transition-all duration-500">
-          <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-orange-400 to-yellow-400 mb-2 tracking-wide text-center">
+        <div class="${containerWidthClass} w-full bg-slate-800 rounded-2xl shadow-2xl border ${containerBorderClass} p-6 flex flex-col items-center transition-all duration-500">
+          <h1 class="text-2xl md:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-orange-400 to-yellow-400 mb-2 tracking-wide text-center">
             シャッフルマインスイーパー
           </h1>
           <p class="text-slate-400 text-xs mb-6 text-center leading-relaxed">
             地雷のないマスを開ける度に、シャッフルの確率が上昇。
             <br />
-            シャッフルされると地雷の位置が変わり、マスの数字も更新されます。
+            シャッフルされると開けてないマスに地雷の再配置。
           </p>
           <div id="game-body" class="w-full flex flex-col items-center"></div>
         </div>
@@ -389,12 +400,20 @@
           </div>
         `;
         } else {
+          //マス目の難易度別テキスト・余白サイズ微調整
           const sizeClass =
             difficulty === "easy"
-              ? "w-14 h-14 text-xl"
+              ? "text-xl py-4"
               : difficulty === "hard"
-                ? "w-10 h-10 text-base"
-                : "w-7 h-7 text-xs";
+                ? "text-base py-2"
+                : "text-xs py-1.5 md:text-sm";
+
+          const gapClass =
+            difficulty === "easy"
+              ? "gap-2"
+              : difficulty === "hard"
+                ? "gap-1.5"
+                : "gap-1";
 
           const colors = [
             "",
@@ -412,7 +431,7 @@
           board.forEach((row, r) => {
             row.forEach((cell, c) => {
               let cellClass =
-                "aspect-square flex items-center justify-center text-base font-black rounded transition-all duration-150 select-none cursor-pointer ";
+                "w-full aspect-square flex items-center justify-center font-black rounded transition-all duration-150 select-none cursor-pointer ";
               let displayContent = "";
 
               if (cell.isRevealed) {
@@ -445,7 +464,7 @@
             });
           });
 
-          let infoMessage = `<span class="text-slate-500 text-xs">安全に開くほどシャッフル確率アップ (${shuffleProbability}%)</span>`;
+          let infoMessage = `<span class="text-slate-500 text-sm font-bold">現在の確率：${shuffleProbability}%</span>`;
           if (shuffledThisTurn) {
             infoMessage = `<span class="text-amber-400 text-sm font-black animate-pulse flex items-center gap-1">🔄 シャッフル発生！地雷の位置が変わりました！</span>`;
           } else if (gameState !== "playing") {
@@ -480,14 +499,12 @@
           `;
           }
 
-          //下部ボタンエリア
           let bottomButtonsAreaHtml = "";
           if (gameState === "playing") {
-            // 初回クリック前は強制シャッフルを押せないように制御（isFirstClickチェック）
             const isShuffleDisabled = isForceShuffleUsed || isFirstClick;
             const forceShuffleBtnClass = isShuffleDisabled
-              ? "bg-slate-800 border-slate-750 text-slate-600 cursor-not-allowed opacity-50"
-              : "bg-amber-600 hover:bg-amber-500 border-amber-700 text-slate-950 font-extrabold cursor-pointer active:scale-95 animate-pulse";
+              ? "bg-slate-800 border-slate-750 text-slate-400 cursor-not-allowed opacity-50"
+              : "bg-amber-600 hover:bg-amber-500 border-amber-700 text-slate-950 font-extrabold cursor-pointer shadow-lg hover:shadow-amber-500/20";
 
             bottomButtonsAreaHtml = `
             <div class="w-full grid grid-cols-2 gap-3">
@@ -499,7 +516,7 @@
               >
                 ${isForceShuffleUsed ? "✕ 強制シャッフル使用済" : "🔄 強制シャッフル (1回限り)"}
               </button>
-              <button onclick="gameState = 'start'; render();" class="py-2 px-3 bg-emerald-500 hover:bg-emerald-400 border border-slate-700 hover:border-slate-600 text-slate-900 hover:text-slate-700 text-xs font-bold rounded-lg transition-all cursor-pointer text-center">
+              <button onclick="gameState = 'start'; render();" class="py-2 px-3 bg-emerald-500 hover:bg-emerald-400 border border-slate-700 hover:border-slate-600 text-slate-900 hover:text-slate-700 text-xs font-bold rounded-lg transition-all cursor-pointer text-center shadow-md">
                 タイトルに戻る
               </button>
             </div>
@@ -523,8 +540,8 @@
 
           <div class="h-6 mb-2 flex items-center justify-center">${infoMessage}</div>
 
-          <div class="p-3 bg-slate-950 rounded-2xl border border-slate-800 shadow-inner mb-6">
-            <div class="grid gap-1.5" style="grid-template-columns: repeat(${gridSize}, minmax(0, 1fr));">
+          <div class="w-full p-3 bg-slate-950 rounded-2xl border border-slate-800 shadow-inner mb-6">
+            <div class="grid ${gapClass}" style="grid-template-columns: repeat(${gridSize}, minmax(0, 1fr));">
               ${gridButtonsHtml}
             </div>
           </div>
