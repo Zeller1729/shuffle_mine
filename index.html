@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>確率シャッフル・マイン</title>
+    <title>シャッフル・マインスイーパー</title>
     <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
     <style>
       /* アニメーション用のカスタムスタイル */
@@ -25,7 +25,10 @@
       }
     </style>
   </head>
-  <body class="min-h-full flex flex-col bg-slate-900 text-slate-100 font-sans">
+  <body
+    id="game-body-bg"
+    class="min-h-full flex flex-col bg-slate-900 text-slate-100 font-sans transition-all duration-700"
+  >
     <div
       id="app"
       class="min-h-screen flex flex-col items-center justify-center p-4"
@@ -262,7 +265,7 @@
         }
 
         // シャッフル抽選
-        const nextProbability = shuffleProbability + 10;
+        const nextProbability = shuffleProbability + 20;
         const isShuffleTriggered = Math.random() * 100 < nextProbability;
 
         if (isShuffleTriggered) {
@@ -298,10 +301,27 @@
       // --- HTMLレンダリング (UIの生成) ---
       function render() {
         let contentHtml = "";
+        const bgContainer = document.getElementById("game-body-bg");
 
-        // 共通のヘッダー部分
+        // 状態に応じたページ全体の背景色切り替え
+        if (gameState === "lost") {
+          bgContainer.className =
+            "min-h-full flex flex-col bg-gradient-to-br from-red-950 via-orange-900 to-slate-900 text-slate-100 font-sans transition-all duration-700";
+        } else if (gameState === "win") {
+          bgContainer.className =
+            "min-h-full flex flex-col bg-gradient-to-br from-emerald-950 via-slate-900 to-slate-900 text-slate-100 font-sans transition-all duration-700";
+        } else {
+          bgContainer.className =
+            "min-h-full flex flex-col bg-slate-900 text-slate-100 font-sans transition-all duration-700";
+        }
+
+        // 共通のヘッダー部分 (ゲームオーバー時はコンテナの枠線等も暖色系に微調整)
+        const containerBorderClass =
+          gameState === "lost"
+            ? "border-red-500/40 shadow-red-900/30"
+            : "border-slate-700";
         const headerHtml = `
-        <div class="max-w-md w-full bg-slate-800 rounded-2xl shadow-2xl border border-slate-700 p-6 flex flex-col items-center">
+        <div class="max-w-md w-full bg-slate-800 rounded-2xl shadow-2xl border ${containerBorderClass} p-6 flex flex-col items-center transition-all duration-500">
           <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-orange-400 to-yellow-400 mb-2 tracking-wide text-center">
             シャッフルマインスイーパー
           </h1>
@@ -379,7 +399,8 @@
 
               if (cell.isRevealed) {
                 if (cell.isMine) {
-                  cellClass += "bg-red-600 text-white shadow-inner";
+                  cellClass +=
+                    "bg-red-600 text-white shadow-inner animate-bounce";
                   displayContent = "💣";
                 } else {
                   cellClass += "bg-slate-800 text-slate-300 shadow-inner";
@@ -417,8 +438,12 @@
           // 結果エリアのHTML
           let resultAreaHtml = "";
           if (gameState !== "playing") {
+            const resultBgClass =
+              gameState === "win"
+                ? "bg-emerald-950/40 border-emerald-500/30"
+                : "bg-red-950/50 border-red-500/40";
             resultAreaHtml = `
-            <div class="w-full flex flex-col items-center gap-4 p-4 rounded-xl border animate-fadeIn mb-4 bg-slate-850 border-slate-700">
+            <div class="w-full flex flex-col items-center gap-4 p-4 rounded-xl border animate-fadeIn mb-4 ${resultBgClass}">
               <div class="text-center">
                 ${
                   gameState === "win"
@@ -427,12 +452,12 @@
                   <p class="text-sm text-slate-300">すべての安全なマスを開けました！</p>
                 `
                     : `
-                  <h2 class="text-2xl background-red-400 font-black text-rose-500 mb-1">💀 ゲームオーバー</h2>
-                  <p class="text-sm text-slate-300">地雷を踏んでしまいました...</p>
+                  <h2 class="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-500 mb-1 tracking-wider uppercase">💀 GAME OVER</h2>
+                  <p class="text-sm text-red-200/90">地雷を踏んでしまいました...</p>
                 `
                 }
               </div>
-              <button onclick="gameState = 'start'; render();" class="w-full py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-100 font-bold rounded-lg transition-all cursor-pointer text-sm">
+              <button onclick="gameState = 'start'; render();" class="w-full py-2.5 bg-gradient-to-r from-slate-700 to-slate-800 hover:from-slate-600 hover:to-slate-700 text-slate-100 font-bold rounded-lg transition-all cursor-pointer text-sm shadow-md">
                 タイトルへ戻る
               </button>
             </div>
