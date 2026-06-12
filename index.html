@@ -45,6 +45,8 @@
       let isFirstClick = true;
       let shuffledThisTurn = false;
       let shuffleTimeoutId = null;
+      let remainingCells = 0;
+      let isForceShuffleUsed = false; // 【新規】強制シャッフルが使用済みかどうかのフラグ
 
       // 難易度ごとのパラメータ定義
       const config = {
@@ -62,7 +64,7 @@
         difficulty = diff;
         gridSize = config[diff].size;
         mineCount = config[diff].mines;
-        render(); // 画面再描画
+        render();
       }
 
       // ゲームの初期化
@@ -85,10 +87,13 @@
           }
           board.push(row);
         }
+        const totalCells = gridSize * gridSize;
+        remainingCells = totalCells - mineCount;
 
         shuffleProbability = 0;
         isFirstClick = true;
         shuffledThisTurn = false;
+        isForceShuffleUsed = false; // 【新規】新ゲーム開始時にフラグをリセット
         if (shuffleTimeoutId) clearTimeout(shuffleTimeoutId);
         gameState = "playing";
         render();
@@ -136,7 +141,7 @@
         recalculateNeighbors();
       }
 
-      // 周囲の地雷数を再計算
+      // 周緯の地雷数を再計算
       function recalculateNeighbors() {
         for (let r = 0; r < gridSize; r++) {
           for (let c = 0; c < gridSize; c++) {
@@ -197,6 +202,25 @@
         recalculateNeighbors();
       }
 
+      // 【新規】強制シャッフルボタンのクリックハンドラ
+      function handleForceShuffle() {
+        if (gameState !== "playing" || isForceShuffleUsed || isFirstClick)
+          return;
+
+        shuffleMines();
+        shuffleProbability = 0; // 蓄積された確率カウントを初期化
+        isForceShuffleUsed = true;
+        shuffledThisTurn = true;
+
+        if (shuffleTimeoutId) clearTimeout(shuffleTimeoutId);
+        shuffleTimeoutId = setTimeout(() => {
+          shuffledThisTurn = false;
+          render();
+        }, 2000);
+
+        render();
+      }
+
       // マスを開ける処理（再帰）
       function revealCell(r, c) {
         const queue = [[r, c]];
@@ -212,6 +236,7 @@
           if (cell.isRevealed || cell.isFlagged) continue;
 
           cell.isRevealed = true;
+          remainingCells--;
 
           if (cell.neighborMines === 0 && !cell.isMine) {
             for (let dr = -1; dr <= 1; dr++) {
@@ -259,6 +284,7 @@
           row.every((item) => item.isMine || item.isRevealed),
         );
         if (isWin) {
+          remainingCells = 0;
           gameState = "win";
           render();
           return;
@@ -303,7 +329,6 @@
         let contentHtml = "";
         const bgContainer = document.getElementById("game-body-bg");
 
-        // 状態に応じたページ全体の背景色切り替え
         if (gameState === "lost") {
           bgContainer.className =
             "min-h-full flex flex-col bg-gradient-to-br from-red-950 via-orange-900 to-slate-900 text-slate-100 font-sans transition-all duration-700";
@@ -315,7 +340,6 @@
             "min-h-full flex flex-col bg-slate-900 text-slate-100 font-sans transition-all duration-700";
         }
 
-        // 共通のヘッダー部分 (ゲームオーバー時はコンテナの枠線等も暖色系に微調整)
         const containerBorderClass =
           gameState === "lost"
             ? "border-red-500/40 shadow-red-900/30"
@@ -326,7 +350,7 @@
             シャッフルマインスイーパー
           </h1>
           <p class="text-slate-400 text-xs mb-6 text-center leading-relaxed">
-            地雷のないマスを開ける度に、シャッフル確率が上昇！
+            地雷のないマスを開ける度に、シャッフルの確率が上昇。
             <br />
             シャッフルされると地雷の位置が変わり、マスの数字も更新されます。
           </p>
@@ -337,7 +361,6 @@
         const gameBody = document.getElementById("game-body");
 
         if (gameState === "start") {
-          // スタート画面
           gameBody.innerHTML = `
           <div class="w-full flex flex-col items-center gap-6 animate-fadeIn">
             <div class="w-full">
@@ -366,9 +389,6 @@
           </div>
         `;
         } else {
-          // プレイ中 & 結果表示画面
-
-          // セルのサイズ調整用クラス
           const sizeClass =
             difficulty === "easy"
               ? "w-14 h-14 text-xl"
@@ -376,7 +396,6 @@
                 ? "w-10 h-10 text-base"
                 : "w-7 h-7 text-xs";
 
-          // 数字ごとの色
           const colors = [
             "",
             "text-blue-400",
@@ -389,7 +408,6 @@
             "text-indigo-400",
           ];
 
-          // グリッド部分の作成
           let gridButtonsHtml = "";
           board.forEach((row, r) => {
             row.forEach((cell, c) => {
@@ -427,15 +445,13 @@
             });
           });
 
-          // 状態通知テキスト
-          let infoMessage = `<span class="text-slate-500 text-xs">安全に開くほどシャッフル確率アップ...</span>`;
+          let infoMessage = `<span class="text-slate-500 text-xs">安全に開くほどシャッフル確率アップ (${shuffleProbability}%)</span>`;
           if (shuffledThisTurn) {
             infoMessage = `<span class="text-amber-400 text-sm font-black animate-pulse flex items-center gap-1">🔄 シャッフル発生！地雷の位置が変わりました！</span>`;
           } else if (gameState !== "playing") {
             infoMessage = "";
           }
 
-          // 結果エリアのHTML
           let resultAreaHtml = "";
           if (gameState !== "playing") {
             const resultBgClass =
@@ -464,13 +480,32 @@
           `;
           }
 
-          // 下部ボタン
-          const bottomButtonHtml =
-            gameState === "playing"
-              ? `<button onclick="gameState = 'start'; render();" class="py-2 px-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 text-slate-400 hover:text-slate-200 text-xs font-bold rounded-lg transition-all cursor-pointer">タイトルに戻る (現在のゲームを終了)</button>`
-              : "";
+          //下部ボタンエリア
+          let bottomButtonsAreaHtml = "";
+          if (gameState === "playing") {
+            // 初回クリック前は強制シャッフルを押せないように制御（isFirstClickチェック）
+            const isShuffleDisabled = isForceShuffleUsed || isFirstClick;
+            const forceShuffleBtnClass = isShuffleDisabled
+              ? "bg-slate-800 border-slate-750 text-slate-600 cursor-not-allowed opacity-50"
+              : "bg-amber-600 hover:bg-amber-500 border-amber-700 text-slate-950 font-extrabold cursor-pointer active:scale-95 animate-pulse";
 
-          // 全体を合体させて挿入
+            bottomButtonsAreaHtml = `
+            <div class="w-full grid grid-cols-2 gap-3">
+              <button 
+                onclick="handleForceShuffle()" 
+                ${isShuffleDisabled ? "disabled" : ""}
+                class="py-2 px-3 border text-xs rounded-lg transition-all text-center ${forceShuffleBtnClass}"
+                title="${isFirstClick ? "最初のマスを開けるまで使えません" : "ゲーム中1回だけ地雷の位置を強制的にシャッフルします"}"
+              >
+                ${isForceShuffleUsed ? "✕ 強制シャッフル使用済" : "🔄 強制シャッフル (1回限り)"}
+              </button>
+              <button onclick="gameState = 'start'; render();" class="py-2 px-3 bg-emerald-500 hover:bg-emerald-400 border border-slate-700 hover:border-slate-600 text-slate-900 hover:text-slate-700 text-xs font-bold rounded-lg transition-all cursor-pointer text-center">
+                タイトルに戻る
+              </button>
+            </div>
+          `;
+          }
+
           gameBody.innerHTML = `
           <div class="w-full flex items-center justify-between bg-slate-850 border border-slate-750 rounded-xl px-4 py-3 mb-4 text-xs font-semibold">
             <div class="flex flex-col">
@@ -478,8 +513,11 @@
               <span class="text-amber-400 text-sm">${config[difficulty].label}</span>
             </div>
             <div class="flex flex-col items-end">
-              <span class="text-slate-400">シャッフル確率</span>
-              <span class="text-rose-400 text-sm font-mono">${shuffleProbability}%</span>
+              <span class="text-slate-400">残りの安全なマス：</span>
+              <div>
+                <span class="text-rose-400 text-sm font-mono">${remainingCells}</span>
+                <span class="text-slate-400">マス</span>
+              </div>
             </div>
           </div>
 
@@ -492,7 +530,7 @@
           </div>
 
           ${resultAreaHtml}
-          ${bottomButtonHtml}
+          ${bottomButtonsAreaHtml}
         `;
         }
       }
