@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>シャッフル・マインスイーパー</title>
+    <title>シャッフルマインスイーパー</title>
     <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
     <style>
       /* アニメーション用のカスタムスタイル */
@@ -34,6 +34,64 @@
       class="min-h-screen flex flex-col items-center justify-center p-4"
     ></div>
 
+    <div
+      id="help-modal"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm hidden animate-fadeIn"
+    >
+      <div
+        class="bg-slate-800 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl relative"
+      >
+        <button
+          onclick="toggleHelpModal()"
+          class="absolute top-4 right-4 text-slate-400 hover:text-slate-200 text-xl font-bold p-1 cursor-pointer"
+        >
+          ✕
+        </button>
+        <h2
+          class="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-400 mb-4 flex items-center gap-2"
+        >
+          📝 シャッフルマインスイーパーの遊び方
+        </h2>
+        <div
+          class="text-xs sm:text-sm text-slate-300 space-y-3 leading-relaxed"
+        >
+          <p>
+            基本ルールは通常のマインスイーパーと同じです。地雷を避けて、すべての安全なマスを開ければ勝利となります。
+          </p>
+          <div class="border-t border-slate-700 my-2"></div>
+          <p class="font-bold text-amber-400">🌀 特殊ルール：確率シャッフル</p>
+          <p>
+            地雷のない安全なマスを1つ開けるたびに、画面中央に表示されている<span
+              class="text-rose-400 font-bold"
+              >「シャッフル確率」が20%ずつ上昇</span
+            >します。
+          </p>
+          <p>
+            画面に出ている確率で**シャッフルが発生**！まだ開いていないマスの中で、地雷の配置がランダムに入れ替わり、マスの数字も再計算されます。
+          </p>
+          <div class="border-t border-slate-700 my-2"></div>
+          <p class="font-bold text-amber-400">🔄 救済機能：強制シャッフル</p>
+          <p>
+            「この周囲は詰んでいてどうしても踏みたくない…」という時、ゲーム中<span
+              class="text-rose-400 font-bold"
+              >1回だけ右下のボタンから地雷の配置を強制的にシャッフル</span
+            >できます。使用後は確率カウントも0%に戻ります。
+          </p>
+          <div class="border-t border-slate-700 my-2"></div>
+          <p class="text-slate-400 text-[11px] font-mono">
+            ※ 操作方法: 左クリック(タップ)でマスを開く /
+            右クリック(長押し)で旗🚩
+          </p>
+        </div>
+        <button
+          onclick="toggleHelpModal()"
+          class="w-full mt-5 py-2 bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-200 font-bold rounded-xl cursor-pointer transition-all text-sm"
+        >
+          閉じる
+        </button>
+      </div>
+    </div>
+
     <script>
       // --- ゲームの初期状態と変数定義 ---
       let gameState = "start"; // start, playing, win, lost
@@ -56,6 +114,12 @@
       };
 
       const appContainer = document.getElementById("app");
+
+      // モーダルの開閉
+      function toggleHelpModal() {
+        const modal = document.getElementById("help-modal");
+        modal.classList.toggle("hidden");
+      }
 
       // --- ゲームロジック ---
 
@@ -348,24 +412,25 @@
         // 難易度に応じて全体の最大幅（max-w）を可変にする
         const containerWidthClass =
           gameState === "start"
-            ? "max-w-md"
+            ? "max-w-xs sm:max-w-md"
             : difficulty === "easy"
-              ? "max-w-sm"
+              ? "max-w-xs"
               : difficulty === "hard"
-                ? "max-w-xl"
-                : "max-w-4xl";
+                ? "max-w-md"
+                : "max-w-xl";
 
         const headerHtml = `
-        <div class="${containerWidthClass} w-full bg-slate-800 rounded-2xl shadow-2xl border ${containerBorderClass} p-6 flex flex-col items-center transition-all duration-500">
-          <h1 class="text-2xl md:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-orange-400 to-yellow-400 mb-2 tracking-wide text-center">
-            シャッフルマインスイーパー
-          </h1>
-          <p class="text-slate-400 text-xs mb-6 text-center leading-relaxed">
-            地雷のないマスを開ける度に、シャッフルの確率が上昇。
-            <br />
-            シャッフルされると開けてないマスに地雷の再配置。
-          </p>
-          <div id="game-body" class="w-full flex flex-col items-center"></div>
+        <div class="${containerWidthClass} w-full bg-slate-800 rounded-2xl shadow-2xl border ${containerBorderClass} p-4 sm:p-5 flex flex-col items-center transition-all duration-500 max-h-[96vh] relative">
+          
+          <button 
+            onclick="toggleHelpModal()" 
+            class="absolute top-3 right-3 bg-slate-700/60 hover:bg-slate-700 text-slate-300 p-2 text-xs font-bold rounded-lg cursor-pointer flex items-center gap-1 active:scale-95 transition-all"
+            title="遊び方を見る"
+          >
+            遊び方📝 <span class="hidden xs:inline">遊び方</span>
+          </button>
+          
+          <div id="game-body" class="w-full flex flex-col items-center mt-4 overflow-hidden"></div>
         </div>
       `;
         appContainer.innerHTML = headerHtml;
@@ -384,7 +449,7 @@
                     (diff) => `
                   <button onclick="setDifficulty('${diff}')" class="py-3 px-4 rounded-xl border text-sm font-bold transition-all duration-200 cursor-pointer ${
                     difficulty === diff
-                      ? "bg-amber-500 border-amber-400 text-slate-950 shadow-lg shadow-amber-500/20 scale-102"
+                      ? "bg-amber-500 border-amber-400 text-slate-950 shadow-lg shadow-amber-500/20"
                       : "bg-slate-700 border-slate-600 hover:bg-slate-650 hover:border-slate-500 text-slate-200"
                   }">
                     ${config[diff].label}
@@ -524,7 +589,7 @@
           }
 
           gameBody.innerHTML = `
-          <div class="w-full flex items-center justify-between bg-slate-850 border border-slate-750 rounded-xl px-4 py-3 mb-4 text-xs font-semibold">
+          <div class="w-full flex items-center justify-between bg-slate-850 border border-slate-750 rounded-xl px-4 py-3 mt-4 mb-2 text-xs font-semibold">
             <div class="flex flex-col">
               <span class="text-slate-400">難易度</span>
               <span class="text-amber-400 text-sm">${config[difficulty].label}</span>
@@ -540,7 +605,7 @@
 
           <div class="h-6 mb-2 flex items-center justify-center">${infoMessage}</div>
 
-          <div class="w-full p-3 bg-slate-950 rounded-2xl border border-slate-800 shadow-inner mb-6">
+          <div class="w-full p-3 bg-slate-950 rounded-2xl border border-slate-800 shadow-inner mb-2">
             <div class="grid ${gapClass}" style="grid-template-columns: repeat(${gridSize}, minmax(0, 1fr));">
               ${gridButtonsHtml}
             </div>
