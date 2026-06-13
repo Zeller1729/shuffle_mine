@@ -12,7 +12,6 @@ const gameArea = document.getElementById("game-area");
 const retryArea = document.getElementById("retry-area");
 const csvFileInput = document.getElementById("csv-file");
 const fileSelectBtn = document.getElementById("file-select-btn");
-const useDefaultBtn = document.getElementById("use-default-btn");
 const maxAttemptsInput = document.getElementById("max-attempts");
 const startBtn = document.getElementById("start-btn");
 const userGuessInput = document.getElementById("user-guess");
@@ -23,7 +22,6 @@ const gameSubtitle = document.getElementById("game-subtitle");
 // イベントリスナーの登録
 fileSelectBtn.addEventListener("click", () => csvFileInput.click());
 csvFileInput.addEventListener("change", handleFileSelect);
-useDefaultBtn.addEventListener("click", loadDefaultCsv);
 
 // ドラッグ＆ドロップのハンドリング
 const chatContainer = document.querySelector(".chat-container");
@@ -73,25 +71,6 @@ function addMessage(sender, text) {
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-// デフォルトのlist.csvを読み込む
-function loadDefaultCsv() {
-  fetch("list.csv")
-    .then((response) => {
-      if (!response.ok) {
-        throw new Error(
-          "list.csv が見つかりません。同一階層にファイルを配置するか、直接ファイルをアップロードしてください。",
-        );
-      }
-      return response.text();
-    })
-    .then((text) => {
-      parseAndSetCsv(text, "list.csv");
-    })
-    .catch((error) => {
-      addMessage("system", `エラー: ${error.message}`);
-    });
-}
-
 // ファイル選択時のハンドラ
 function handleFileSelect(e) {
   const file = e.target.files[0];
@@ -137,9 +116,9 @@ function parseAndSetCsv(text, filename) {
   elementsList = words;
   addMessage(
     "system",
-    `「${filename}」から単語リストを読み込みました！\n登録単語数: ${elementsList.length} 件\n(最初:「${elementsList[0]}」 〜 最後:「${elementsList[elementsList.length - 1]}」)\n\n次に、回答可能な回数を入力して「ゲーム開始」ボタンを押してください。`,
+    `「${filename}」から単語リストを読み込みました！\n登録単語数: ${elementsList.length} 件\n\n次に、回答可能な回数を入力して「ゲーム開始」ボタンを押してください。`,
   );
-
+  console.log("Loaded words:", elementsList); // デバッグ用ログ
   gameSubtitle.textContent = `読み込み済み: ${filename} (単語数: ${elementsList.length})`;
 
   // UI切り替え
@@ -172,7 +151,7 @@ function startGame() {
   // 開始メッセージを表示
   addMessage(
     "system",
-    `ゲームを開始しました！\n回答可能回数は ${maxAttempts} 回です。\nリスト内のいずれかの言葉（例：${elementsList[Math.floor(elementsList.length / 2)]} など）を入力して送信してください。`,
+    `ゲームを開始しました！\n回答可能回数は ${maxAttempts} 回です。\nリスト内のいずれかの言葉を入力して送信してください。`,
   );
 }
 
@@ -188,7 +167,7 @@ function submitGuess() {
   if (guessIndex === -1) {
     addMessage(
       "system",
-      `「${guess}」は、ロードされた単語リストに含まれていません。正しい表記で入力されているか確認してください。\n（※回数は減りません）`,
+      `「${guess}」は、単語リストに含まれていません。正しい表記で入力されているか確認してください。\n（※回数は減りません）`,
     );
     userGuessInput.value = "";
     return;
@@ -213,7 +192,7 @@ function submitGuess() {
     // 回数切れでゲームオーバー
     addMessage(
       "system",
-      `残念！回答回数がなくなりました。\n正解は「${targetElement}」でした。\n😢あなたの負けです😢`,
+      `残念！回答回数がなくなりました。\n正解は「${targetElement}」でした。\,,``🤪nあなたの負けです！🤪`,
     );
     endGame(false);
   } else {

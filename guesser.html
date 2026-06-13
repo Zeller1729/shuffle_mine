@@ -3,15 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>元素周期表単語推測ゲーム</title>
+    <title>言葉推測ゲーム</title>
     <link rel="stylesheet" href="./guesseer_styles/style.css" />
   </head>
   <body>
     <div class="chat-container">
       <header class="chat-header">
-        <h1>元素周期表 単語推測ゲーム</h1>
-        <p class="subtitle">
-          水素(H)からカルシウム(Ca)までの20元素から正解を推測しよう！
+        <h1>言葉推測ゲーム</h1>
+        <p class="subtitle" id="game-subtitle">
+          リストを読み込んで、正解の言葉を順番から推測しよう！
         </p>
       </header>
 
@@ -19,21 +19,38 @@
         <!-- メッセージはJSで動的に追加されます -->
         <div class="message system">
           <div class="bubble">
-            ゲームを開始するには、まず回答可能な回数を入力して「ゲーム開始」ボタンを押してください。
+            ゲームを開始します。CSVファイルをここにドラッグ＆ドロップ、または以下の「CSVを選択」ボタンからお好みのリストを読み込んでください。
           </div>
         </div>
       </main>
 
       <footer class="chat-footer">
+        <!-- CSVファイル選択エリア -->
+        <div id="file-area" class="input-area">
+          <input
+            type="file"
+            id="csv-file"
+            accept=".csv"
+            style="display: none"
+          />
+          <button
+            id="file-select-btn"
+            class="send-btn"
+            style="background-color: #64748b; flex: 1"
+          >
+            CSVファイルを選択
+          </button>
+        </div>
+
         <!-- 初期状態：回数設定フォーム -->
-        <div id="setup-area" class="input-area">
+        <div id="setup-area" class="input-area hidden">
           <input
             type="number"
             id="max-attempts"
             min="1"
             max="100"
-            placeholder="回答回数（例: 10）"
-            value="10"
+            placeholder="回答回数（例: 5）"
+            value="5"
           />
           <button id="start-btn" class="send-btn">ゲーム開始</button>
         </div>
@@ -43,7 +60,7 @@
           <input
             type="text"
             id="user-guess"
-            placeholder="元素名をカタカナで入力（例：ヘリウム）"
+            placeholder="言葉を入力してください"
             autocomplete="off"
           />
           <button id="guess-btn" class="send-btn">送信</button>
