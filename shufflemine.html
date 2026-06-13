@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="ja" class="h-full antialiased">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>シャッフルマインスイーパー</title>
+    <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
+    <style>
+      /* アニメーション用のカスタムスタイル */
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .animate-fadeIn {
+        animation: fadeIn 0.3s ease-out forwards;
+      }
+      .scale-102 {
+        transform: scale(1.02);
+      }
+    </style>
+  </head>
+  <body
+    id="game-body-bg"
+    class="min-h-full flex flex-col bg-slate-900 text-slate-100 font-sans transition-all duration-700"
+  >
+    <div
+      id="app"
+      class="min-h-screen flex flex-col items-center justify-center p-4"
+    ></div>
+
+    <div
+      id="help-modal"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm hidden animate-fadeIn"
+    >
+      <div
+        class="bg-slate-800 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl relative"
+      >
+        <button
+          onclick="toggleHelpModal()"
+          class="absolute top-4 right-4 text-slate-400 hover:text-slate-200 text-xl font-bold p-1 cursor-pointer"
+        >
+          ✕
+        </button>
+        <h2
+          class="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-400 mb-4 flex items-center gap-2"
+        >
+          📝 シャッフルマインスイーパーの遊び方
+        </h2>
+        <div
+          class="text-xs sm:text-sm text-slate-300 space-y-3 leading-relaxed"
+        >
+          <p>
+            基本ルールは通常のマインスイーパーと同じです。地雷を避けて、すべての安全なマスを開ければ勝利となります。
+          </p>
+          <div class="border-t border-slate-700 my-2"></div>
+          <p class="font-bold text-amber-400">🌀 特殊ルール：確率シャッフル</p>
+          <p>
+            地雷のない安全なマスを1つ開けるたびに、画面中央に表示されている<span
+              class="text-rose-400 font-bold"
+              >「シャッフル確率」が20%ずつ上昇</span
+            >します。
+          </p>
+          <p>
+            画面に出ている確率で**シャッフルが発生**！まだ開いていないマスの中で、地雷の配置がランダムに入れ替わり、マスの数字も再計算されます。
+          </p>
+          <div class="border-t border-slate-700 my-2"></div>
+          <p class="font-bold text-amber-400">🔄 救済機能：強制シャッフル</p>
+          <p>
+            「この周囲は詰んでいてどうしても踏みたくない…」という時、ゲーム中<span
+              class="text-rose-400 font-bold"
+              >1回だけ右下のボタンから地雷の配置を強制的にシャッフル</span
+            >できます。使用後は確率カウントも0%に戻ります。
+          </p>
+          <div class="border-t border-slate-700 my-2"></div>
+          <p class="text-slate-400 text-[11px] font-mono">
+            ※ 操作方法: 左クリック(タップ)でマスを開く /
+            右クリック(長押し)で旗🚩
+          </p>
+        </div>
+        <button
+          onclick="toggleHelpModal()"
+          class="w-full mt-5 py-2 bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-200 font-bold rounded-xl cursor-pointer transition-all text-sm"
+        >
+          閉じる
+        </button>
+      </div>
+    </div>
+
+    <script>
+      // --- ゲームの初期状態と変数定義 ---
+      let gameState = "start"; // start, playing, win, lost
+      let difficulty = "easy"; // easy, hard, hell
+      let gridSize = 5;
+      let mineCount = 3;
+      let board = [];
+      let shuffleProbability = 0;
+      let isFirstClick = true;
+      let shuffledThisTurn = false;
+      let shuffleTimeoutId = null;
+      let remainingCells = 0;
+      let isForceShuffleUsed = false;
+
+      // 難易度ごとのパラメータ定義
+      const config = {
+        easy: { size: 5, mines: 6, label: "簡単 (5 × 5)" },
+        hard: { size: 10, mines: 20, label: "難しい (10 × 10)" },
+        hell: { size: 15, mines: 50, label: "地獄 (15 × 15)" },
+      };
+
+      const appContainer = document.getElementById("app");
+
+      // モーダルの開閉
+      function toggleHelpModal() {
+        const modal = document.getElementById("help-modal");
+        modal.classList.toggle("hidden");
+      }
+
+      // --- ゲームロジック ---
+
+      // 難易度変更
+      function setDifficulty(diff) {
+        difficulty = diff;
+        gridSize = config[diff].size;
+        mineCount = config[diff].mines;
+        render();
+      }
+
+      // ゲームの初期化
+      function initGame() {
+        gridSize = config[difficulty].size;
+        mineCount = config[difficulty].mines;
+        board = [];
+
+        for (let r = 0; r < gridSize; r++) {
+          const row = [];
+          for (let c = 0; c < gridSize; c++) {
+            row.push({
+              row: r,
+              col: c,
+              isMine: false,
+              isRevealed: false,
+              isFlagged: false,
+              neighborMines: 0,
+            });
+          }
+          board.push(row);
+        }
+        const totalCells = gridSize * gridSize;
+        remainingCells = totalCells - mineCount;
+
+        shuffleProbability = 0;
+        isFirstClick = true;
+        shuffledThisTurn = false;
+        isForceShuffleUsed = false;
+        if (shuffleTimeoutId) clearTimeout(shuffleTimeoutId);
+        gameState = "playing";
+        render();
+      }
+
+      // 初回クリック時の地雷生成（安全確保）
+      function generateMines(startRow, startCol) {
+        const candidates = [];
+        for (let r = 0; r < gridSize; r++) {
+          for (let c = 0; c < gridSize; c++) {
+            const isStartOrNeighbor =
+              Math.abs(r - startRow) <= 1 && Math.abs(c - startCol) <= 1;
+            if (!isStartOrNeighbor) {
+              candidates.push({ r, c });
+            }
+          }
+        }
+
+        if (candidates.length < mineCount) {
+          candidates.length = 0;
+          for (let r = 0; r < gridSize; r++) {
+            for (let c = 0; c < gridSize; c++) {
+              if (r !== startRow || c !== startCol) {
+                candidates.push({ r, c });
+              }
+            }
+          }
+        }
+
+        // フィッシャー–イェーツのシャッフル
+        for (let i = candidates.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          const temp = candidates[i];
+          candidates[i] = candidates[j];
+          candidates[j] = temp;
+        }
+
+        const placedMines = candidates.slice(0, mineCount);
+        board.forEach((row) => row.forEach((cell) => (cell.isMine = false)));
+
+        placedMines.forEach(({ r, c }) => {
+          board[r][c].isMine = true;
+        });
+
+        recalculateNeighbors();
+      }
+
+      // 周緯の地雷数を再計算
+      function recalculateNeighbors() {
+        for (let r = 0; r < gridSize; r++) {
+          for (let c = 0; c < gridSize; c++) {
+            if (board[r][c].isMine) {
+              board[r][c].neighborMines = 0;
+              continue;
+            }
+            let count = 0;
+            for (let dr = -1; dr <= 1; dr++) {
+              for (let dc = -1; dc <= 1; dc++) {
+                const nr = r + dr;
+                const nc = c + dc;
+                if (nr >= 0 && nr < gridSize && nc >= 0 && nc < gridSize) {
+                  if (board[nr][nc].isMine) count++;
+                }
+              }
+            }
+            board[r][c].neighborMines = count;
+          }
+        }
+      }
+
+      // 地雷のシャッフル処理
+      function shuffleMines() {
+        const unrevealedCells = [];
+        for (let r = 0; r < gridSize; r++) {
+          for (let c = 0; c < gridSize; c++) {
+            if (!board[r][c].isRevealed) {
+              unrevealedCells.push(board[r][c]);
+            }
+          }
+        }
+
+        if (unrevealedCells.length <= mineCount) return;
+
+        const indices = Array.from(
+          { length: unrevealedCells.length },
+          (_, i) => i,
+        );
+        for (let i = indices.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          const temp = indices[i];
+          indices[i] = indices[j];
+          indices[j] = temp;
+        }
+
+        board.forEach((row) =>
+          row.forEach((cell) => {
+            if (!cell.isRevealed) cell.isMine = false;
+          }),
+        );
+
+        for (let k = 0; k < mineCount; k++) {
+          const targetCell = unrevealedCells[indices[k]];
+          board[targetCell.row][targetCell.col].isMine = true;
+        }
+
+        recalculateNeighbors();
+      }
+
+      // 強制シャッフルボタンのクリックハンドラ
+      function handleForceShuffle() {
+        if (gameState !== "playing" || isForceShuffleUsed || isFirstClick)
+          return;
+
+        shuffleMines();
+        shuffleProbability = 0;
+        isForceShuffleUsed = true;
+        shuffledThisTurn = true;
+
+        if (shuffleTimeoutId) clearTimeout(shuffleTimeoutId);
+        shuffleTimeoutId = setTimeout(() => {
+          shuffledThisTurn = false;
+          render();
+        }, 2000);
+
+        render();
+      }
+
+      // マスを開ける処理（再帰）
+      function revealCell(r, c) {
+        const queue = [[r, c]];
+        const visited = new Set();
+
+        while (queue.length > 0) {
+          const [currR, currC] = queue.shift();
+          const key = `${currR},${currC}`;
+          if (visited.has(key)) continue;
+          visited.add(key);
+
+          const cell = board[currR][currC];
+          if (cell.isRevealed || cell.isFlagged) continue;
+
+          cell.isRevealed = true;
+          remainingCells--;
+
+          if (cell.neighborMines === 0 && !cell.isMine) {
+            for (let dr = -1; dr <= 1; dr++) {
+              for (let dc = -1; dc <= 1; dc++) {
+                const nr = currR + dr;
+                const nc = currC + dc;
+                if (nr >= 0 && nr < gridSize && nc >= 0 && nc < gridSize) {
+                  if (!board[nr][nc].isRevealed && !board[nr][nc].isFlagged) {
+                    queue.push([nr, nc]);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // 左クリック（マスを開く）
+      function handleCellClick(r, c) {
+        if (gameState !== "playing") return;
+
+        const cell = board[r][c];
+        if (cell.isRevealed || cell.isFlagged) return;
+
+        if (isFirstClick) {
+          generateMines(r, c);
+          isFirstClick = false;
+        }
+
+        if (board[r][c].isMine) {
+          board.forEach((row) =>
+            row.forEach((item) => {
+              if (item.isMine) item.isRevealed = true;
+            }),
+          );
+          gameState = "lost";
+          render();
+          return;
+        }
+
+        revealCell(r, c);
+
+        // 勝利判定
+        const isWin = board.every((row) =>
+          row.every((item) => item.isMine || item.isRevealed),
+        );
+        if (isWin) {
+          remainingCells = 0;
+          gameState = "win";
+          render();
+          return;
+        }
+
+        // シャッフル抽選
+        const nextProbability = shuffleProbability + 20;
+        const isShuffleTriggered = Math.random() * 100 < nextProbability;
+
+        if (isShuffleTriggered) {
+          shuffleMines();
+          shuffleProbability = 0;
+          shuffledThisTurn = true;
+
+          if (shuffleTimeoutId) clearTimeout(shuffleTimeoutId);
+          shuffleTimeoutId = setTimeout(() => {
+            shuffledThisTurn = false;
+            render();
+          }, 2000);
+        } else {
+          shuffleProbability = nextProbability;
+          shuffledThisTurn = false;
+        }
+
+        render();
+      }
+
+      // 右クリック（旗を立てる）
+      function handleCellRightClick(e, r, c) {
+        e.preventDefault();
+        if (gameState !== "playing") return;
+
+        const cell = board[r][c];
+        if (cell.isRevealed) return;
+
+        cell.isFlagged = !cell.isFlagged;
+        render();
+      }
+
+      // --- HTMLレンダリング (UIの生成) ---
+      function render() {
+        let contentHtml = "";
+        const bgContainer = document.getElementById("game-body-bg");
+
+        if (gameState === "lost") {
+          bgContainer.className =
+            "min-h-full flex flex-col bg-gradient-to-br from-red-950 via-orange-900 to-slate-900 text-slate-100 font-sans transition-all duration-700";
+        } else if (gameState === "win") {
+          bgContainer.className =
+            "min-h-full flex flex-col bg-gradient-to-br from-emerald-950 via-slate-900 to-slate-900 text-slate-100 font-sans transition-all duration-700";
+        } else {
+          bgContainer.className =
+            "min-h-full flex flex-col bg-slate-900 text-slate-100 font-sans transition-all duration-700";
+        }
+
+        const containerBorderClass =
+          gameState === "lost"
+            ? "border-red-500/40 shadow-red-900/30"
+            : "border-slate-700";
+
+        // 難易度に応じて全体の最大幅（max-w）を可変にする
+        const containerWidthClass =
+          gameState === "start"
+            ? "max-w-xs sm:max-w-md"
+            : difficulty === "easy"
+              ? "max-w-xs"
+              : difficulty === "hard"
+                ? "max-w-md"
+                : "max-w-xl";
+
+        const headerHtml = `
+        <div class="${containerWidthClass} w-full bg-slate-800 rounded-2xl shadow-2xl border ${containerBorderClass} p-4 sm:p-5 flex flex-col items-center transition-all duration-500 max-h-[96vh] relative">
+          
+          <button 
+            onclick="toggleHelpModal()" 
+            class="absolute top-3 right-3 bg-slate-700/60 hover:bg-slate-700 text-slate-300 p-2 text-xs font-bold rounded-lg cursor-pointer flex items-center gap-1 active:scale-95 transition-all"
+            title="遊び方を見る"
+          >
+            遊び方📝 <span class="hidden xs:inline">遊び方</span>
+          </button>
+          
+          <div id="game-body" class="w-full flex flex-col items-center mt-4 overflow-hidden"></div>
+        </div>
+      `;
+        appContainer.innerHTML = headerHtml;
+        const gameBody = document.getElementById("game-body");
+
+        if (gameState === "start") {
+          gameBody.innerHTML = `
+          <div class="w-full flex flex-col items-center gap-6 animate-fadeIn">
+            <div class="w-full">
+              <label class="block text-sm font-semibold text-slate-300 mb-3 text-center">
+                難易度を選択してください
+              </label>
+              <div class="grid grid-cols-1 gap-3">
+                ${["easy", "hard", "hell"]
+                  .map(
+                    (diff) => `
+                  <button onclick="setDifficulty('${diff}')" class="py-3 px-4 rounded-xl border text-sm font-bold transition-all duration-200 cursor-pointer ${
+                    difficulty === diff
+                      ? "bg-amber-500 border-amber-400 text-slate-950 shadow-lg shadow-amber-500/20"
+                      : "bg-slate-700 border-slate-600 hover:bg-slate-650 hover:border-slate-500 text-slate-200"
+                  }">
+                    ${config[diff].label}
+                  </button>
+                `,
+                  )
+                  .join("")}
+              </div>
+            </div>
+            <button onclick="initGame()" class="w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black rounded-xl shadow-lg hover:shadow-emerald-500/10 active:scale-98 transition-all cursor-pointer text-base uppercase tracking-wider">
+              ゲームスタート
+            </button>
+          </div>
+        `;
+        } else {
+          //マス目の難易度別テキスト・余白サイズ微調整
+          const sizeClass =
+            difficulty === "easy"
+              ? "text-xl py-4"
+              : difficulty === "hard"
+                ? "text-base py-2"
+                : "text-xs py-1.5 md:text-sm";
+
+          const gapClass =
+            difficulty === "easy"
+              ? "gap-2"
+              : difficulty === "hard"
+                ? "gap-1.5"
+                : "gap-1";
+
+          const colors = [
+            "",
+            "text-blue-400",
+            "text-emerald-400",
+            "text-rose-400",
+            "text-purple-400",
+            "text-amber-400",
+            "text-cyan-400",
+            "text-pink-400",
+            "text-indigo-400",
+          ];
+
+          let gridButtonsHtml = "";
+          board.forEach((row, r) => {
+            row.forEach((cell, c) => {
+              let cellClass =
+                "w-full aspect-square flex items-center justify-center font-black rounded transition-all duration-150 select-none cursor-pointer ";
+              let displayContent = "";
+
+              if (cell.isRevealed) {
+                if (cell.isMine) {
+                  cellClass +=
+                    "bg-red-600 text-white shadow-inner animate-bounce";
+                  displayContent = "💣";
+                } else {
+                  cellClass += "bg-slate-800 text-slate-300 shadow-inner";
+                  if (cell.neighborMines > 0) {
+                    displayContent = cell.neighborMines;
+                    cellClass += ` ${colors[cell.neighborMines] || "text-slate-300"}`;
+                  }
+                }
+              } else {
+                cellClass +=
+                  "bg-slate-700 hover:bg-slate-600 active:scale-95 shadow-md border-b-2 border-slate-800";
+                if (cell.isFlagged) {
+                  displayContent = "🚩";
+                }
+              }
+
+              gridButtonsHtml += `
+              <button 
+                class="${cellClass} ${sizeClass}" 
+                onclick="handleCellClick(${r}, ${c})" 
+                oncontextmenu="handleCellRightClick(event, ${r}, ${c})"
+              >${displayContent}</button>
+            `;
+            });
+          });
+
+          let infoMessage = `<span class="text-slate-500 text-sm font-bold">現在の確率：${shuffleProbability}%</span>`;
+          if (shuffledThisTurn) {
+            infoMessage = `<span class="text-amber-400 text-sm font-black animate-pulse flex items-center gap-1">🔄 シャッフル発生！地雷の位置が変わりました！</span>`;
+          } else if (gameState !== "playing") {
+            infoMessage = "";
+          }
+
+          let resultAreaHtml = "";
+          if (gameState !== "playing") {
+            const resultBgClass =
+              gameState === "win"
+                ? "bg-emerald-950/40 border-emerald-500/30"
+                : "bg-red-950/50 border-red-500/40";
+            resultAreaHtml = `
+            <div class="w-full flex flex-col items-center gap-4 p-4 rounded-xl border animate-fadeIn mb-4 ${resultBgClass}">
+              <div class="text-center">
+                ${
+                  gameState === "win"
+                    ? `
+                  <h2 class="text-2xl font-black text-emerald-400 mb-1">🎉 勝利！</h2>
+                  <p class="text-sm text-slate-300">すべての安全なマスを開けました！</p>
+                `
+                    : `
+                  <h2 class="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-500 mb-1 tracking-wider uppercase">💀 GAME OVER</h2>
+                  <p class="text-sm text-red-200/90">地雷を踏んでしまいました...</p>
+                `
+                }
+              </div>
+              <button onclick="gameState = 'start'; render();" class="w-full py-2.5 bg-gradient-to-r from-slate-700 to-slate-800 hover:from-slate-600 hover:to-slate-700 text-slate-100 font-bold rounded-lg transition-all cursor-pointer text-sm shadow-md">
+                タイトルへ戻る
+              </button>
+            </div>
+          `;
+          }
+
+          let bottomButtonsAreaHtml = "";
+          if (gameState === "playing") {
+            const isShuffleDisabled = isForceShuffleUsed || isFirstClick;
+            const forceShuffleBtnClass = isShuffleDisabled
+              ? "bg-slate-800 border-slate-750 text-slate-400 cursor-not-allowed opacity-50"
+              : "bg-amber-600 hover:bg-amber-500 border-amber-700 text-slate-950 font-extrabold cursor-pointer shadow-lg hover:shadow-amber-500/20";
+
+            bottomButtonsAreaHtml = `
+            <div class="w-full grid grid-cols-2 gap-3">
+              <button 
+                onclick="handleForceShuffle()" 
+                ${isShuffleDisabled ? "disabled" : ""}
+                class="py-2 px-3 border text-xs rounded-lg transition-all text-center ${forceShuffleBtnClass}"
+                title="${isFirstClick ? "最初のマスを開けるまで使えません" : "ゲーム中1回だけ地雷の位置を強制的にシャッフルします"}"
+              >
+                ${isForceShuffleUsed ? "✕ 強制シャッフル使用済" : "🔄 強制シャッフル (1回限り)"}
+              </button>
+              <button onclick="gameState = 'start'; render();" class="py-2 px-3 bg-emerald-500 hover:bg-emerald-400 border border-slate-700 hover:border-slate-600 text-slate-900 hover:text-slate-700 text-xs font-bold rounded-lg transition-all cursor-pointer text-center shadow-md">
+                タイトルに戻る
+              </button>
+            </div>
+          `;
+          }
+
+          gameBody.innerHTML = `
+          <div class="w-full flex items-center justify-between bg-slate-850 border border-slate-750 rounded-xl px-4 py-3 mt-4 mb-2 text-xs font-semibold">
+            <div class="flex flex-col">
+              <span class="text-slate-400">難易度</span>
+              <span class="text-amber-400 text-sm">${config[difficulty].label}</span>
+            </div>
+            <div class="flex flex-col items-end">
+              <span class="text-slate-400">残りの安全なマス：</span>
+              <div>
+                <span class="text-rose-400 text-sm font-mono">${remainingCells}</span>
+                <span class="text-slate-400">マス</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="h-6 mb-2 flex items-center justify-center">${infoMessage}</div>
+
+          <div class="w-full p-3 bg-slate-950 rounded-2xl border border-slate-800 shadow-inner mb-2">
+            <div class="grid ${gapClass}" style="grid-template-columns: repeat(${gridSize}, minmax(0, 1fr));">
+              ${gridButtonsHtml}
+            </div>
+          </div>
+
+          ${resultAreaHtml}
+          ${bottomButtonsAreaHtml}
+        `;
+        }
+      }
+
+      // 初回起動時のレンダリング
+      render();
+    </script>
+  </body>
+</html>
