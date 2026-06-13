@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>元素周期表単語推測ゲーム</title>
+    <link rel="stylesheet" href="./guesseer_styles/style.css" />
+  </head>
+  <body>
+    <div class="chat-container">
+      <header class="chat-header">
+        <h1>元素周期表 単語推測ゲーム</h1>
+        <p class="subtitle">
+          水素(H)からカルシウム(Ca)までの20元素から正解を推測しよう！
+        </p>
+      </header>
+
+      <main class="chat-messages" id="chat-messages">
+        <!-- メッセージはJSで動的に追加されます -->
+        <div class="message system">
+          <div class="bubble">
+            ゲームを開始するには、まず回答可能な回数を入力して「ゲーム開始」ボタンを押してください。
+          </div>
+        </div>
+      </main>
+
+      <footer class="chat-footer">
+        <!-- 初期状態：回数設定フォーム -->
+        <div id="setup-area" class="input-area">
+          <input
+            type="number"
+            id="max-attempts"
+            min="1"
+            max="100"
+            placeholder="回答回数（例: 10）"
+            value="10"
+          />
+          <button id="start-btn" class="send-btn">ゲーム開始</button>
+        </div>
+
+        <!-- ゲーム進行中：回答フォーム（初期非表示） -->
+        <div id="game-area" class="input-area hidden">
+          <input
+            type="text"
+            id="user-guess"
+            placeholder="元素名をカタカナで入力（例：ヘリウム）"
+            autocomplete="off"
+          />
+          <button id="guess-btn" class="send-btn">送信</button>
+        </div>
+
+        <!-- ゲーム終了後：リトライフォーム（初期非表示） -->
+        <div id="retry-area" class="input-area hidden">
+          <button id="retry-btn" class="retry-btn">もう一回遊ぶ</button>
+        </div>
+      </footer>
+    </div>
+
+    <script src="./guesseer_styles/script.js"></script>
+  </body>
+</html>
